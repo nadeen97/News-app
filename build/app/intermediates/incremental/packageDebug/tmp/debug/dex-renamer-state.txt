@@ -1,0 +1,4 @@
+#Sun Jul 26 18:04:58 EET 2020
+base.0=/Volumes/W/ForInterview/startup company/news_app/build/app/intermediates/dex/debug/mergeDexDebug/out/classes.dex
+path.0=classes.dex
+renamed.0=classes.dex
