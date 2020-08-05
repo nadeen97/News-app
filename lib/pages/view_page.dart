@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart'as http;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +11,7 @@ import 'package:newsapp/classes/news.dart';
 import 'package:newsapp/classes/progress.dart';
 import 'package:newsapp/pages/catogries_page.dart';
 import 'package:newsapp/pages/details_news.dart';
+
 
 class ViewPage extends StatefulWidget {
   bool isCatogry=false;
@@ -19,11 +23,11 @@ class ViewPage extends StatefulWidget {
 }
 
 class _ViewPageState extends State<ViewPage> {
-  var response;
+//  var response;
   bool isCatogry=false;
   String catogryName="general";
   String categoryTitle="أحدث الأخبار";
-  List<News> allNews=[];
+  var allNews=[];
   _ViewPageState(this.isCatogry,this.catogryName,this.categoryTitle);
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,8 @@ class _ViewPageState extends State<ViewPage> {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => CatogriesPage()
                     ));
-              },)
+              },),
+//              IconButton(icon: Icon(Icons.book),onPressed:() =>Navigator.push(context, MaterialPageRoute(builder: (context)=>TestPage())),)
             ],
           ),
           body:
@@ -55,7 +60,7 @@ allNews.isEmpty?circularProgress():
                       children: <Widget>[
                         Container(
                           child: Image.network(
-                            allNews[index].imageUrl, height: 250,),
+                            allNews[index].imageUrl??"https://firebasestorage.googleapis.com/v0/b/hellofirebase-60e4d.appspot.com/o/image.png?alt=media&token=1bb7813e-81dd-4fa2-9583-497c3ee8f964", height: 250,),
                         ),
                         Padding(padding: EdgeInsets.all(16.0),
                             child: Text(allNews[index].title, style: TextStyle(
@@ -105,48 +110,23 @@ allNews.isEmpty?circularProgress():
     super.initState();
     print("I am in iniiiit");
     fetchData();
-    startTimer();
-    print(allNews);
-
   }
+
   fetchData()async
   {
-    print("iam in fetch data");
-    allNews.clear();
-    String url="http://newsapi.org/v2/top-headlines?country=eg&apiKey=97aa0b4d4bd94d50896b79f4b022449f";
-
-    if(isCatogry)
-  {
-   url="http://newsapi.org/v2/top-headlines?category=$catogryName&country=eg&apiKey=97aa0b4d4bd94d50896b79f4b022449f";
+    while(true) {
+     allNews= await compute(fetchDataBackend, catogryName) as List  ;
+      setState(() {
+        allNews = allNews;
+      });
+     await Isolate.spawn(refreshPage, 10);
+    }
   }
-    else{
-      url="http://newsapi.org/v2/top-headlines?country=eg&apiKey=97aa0b4d4bd94d50896b79f4b022449f";
-    }
-    response= await http.get(url);
-    if(response.statusCode==200) {
-      Map<String, dynamic>bodyResponse = json.decode(response.body);
-      var articles = bodyResponse['articles'];
-      for (int i = 0; i < articles.length; i++) {
-        var article = articles[i];
-        var src = article['source'];
-        setState(() {
-          allNews.add(News(
-              source: src['name'],
-              author: article['author'],
-              title: article['title'],
-              description: article['description'],
-              imageUrl: article['urlToImage'],
-              date: article['publishedAt']));
-        });
 
-      }
-    }
-    else{
-      throw Exception("Faild to load Data");
-    }
-//    print(response.body);
 
-  }
+
+
+
 //  _checkInternetConnectivity() async {
 //    var result = await Connectivity().checkConnectivity();
 //    if (result == ConnectivityResult.none) {
@@ -163,28 +143,71 @@ allNews.isEmpty?circularProgress():
 //    }
 //  }
 
-int timeRefresh=10;
-  Timer timer;
-void startTimer()
-{
-  timeRefresh=10;
-  timer=Timer.periodic(Duration(seconds: 1), (timer) {
-    if(timeRefresh>0)
-      {
-        setState(() {
-          timeRefresh--;
+//int timeRefresh=10;
+//  Timer timer;
+//void startTimer()
+//{
+//  timeRefresh=10;
+//  timer=Timer.periodic(Duration(seconds: 1), (timer) {
+//    if(timeRefresh>0)
+//      {
+//        setState(() {
+//          timeRefresh--;
+//
+//        });
+//      }
+//    else
+//      {
+//        fetchData();
+//        setState(() {
+//          allNews=allNews;
+//          timeRefresh=10;
+//
+//        });
+//      }
+//  });
+//}
 
-        });
-      }
-    else
-      {
-        fetchData();
-        setState(() {
-          allNews=allNews;
-          timeRefresh=10;
-
-        });
-      }
-  });
 }
+refreshPage(int time)
+{
+  print("start 10 seconds");
+  sleep(Duration(seconds: time));
+  print("Iam done 10 seconds");
+//  return;
+
+
+}
+fetchDataBackend(String catogryName) async
+{
+  List<News> allNews=[];
+  var response;
+  print("iam in backend data");
+  allNews.clear();
+  String url="http://newsapi.org/v2/top-headlines?category=$catogryName&country=eg&apiKey=97aa0b4d4bd94d50896b79f4b022449f";
+
+
+  response=await  http.get(url);
+  if(response.statusCode==200) {
+    Map<String, dynamic>bodyResponse = json.decode(response.body);
+    var articles = bodyResponse['articles'];
+    for (int i = 0; i < articles.length; i++) {
+      var article = articles[i];
+      var src = article['source'];
+        allNews.add(News(
+            source: src['name'],
+            author: article['author'],
+            title: article['title'],
+            description: article['description'],
+            imageUrl: article['urlToImage'],
+            date: article['publishedAt']));
+
+    }
+  }
+  else{
+    throw Exception("Faild to load Data");
+  }
+//    print(response.body);
+
+return allNews;
 }
